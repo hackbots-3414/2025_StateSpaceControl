@@ -15,6 +15,7 @@ import edu.wpi.first.math.system.LinearSystem;
 import edu.wpi.first.math.system.LinearSystemLoop;
 import edu.wpi.first.math.system.plant.LinearSystemId;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.PS5Controller;
 import edu.wpi.first.wpilibj.TimedRobot;
 
 /**
@@ -23,7 +24,7 @@ import edu.wpi.first.wpilibj.TimedRobot;
  */
 public class Robot extends TimedRobot {
   private static final int kMotorPort = 0;
-  private static final int kJoystickPort = 0;
+  private static final int kControllerPort = 0;
   private static final double kSpinupRadPerSec = 60;
 
   // Volts per (radian per second)
@@ -67,22 +68,23 @@ public class Robot extends TimedRobot {
   private final TalonFX m_motor = new TalonFX(kMotorPort);
 
   // A joystick to read the trigger from.
-  private final Joystick m_joystick = new Joystick(kJoystickPort);
+  private final PS5Controller m_joystick = new PS5Controller(kControllerPort);
 
   @Override
   public void teleopInit() {
     // Reset our loop to make sure it's in a known state.
     m_loop.reset(VecBuilder.fill(getEncoderRate()));
+
   }
 
   @Override
   public void teleopPeriodic() {
     // Sets the target speed of our flywheel. This is similar to setting the setpoint of a
     // PID controller.
-    if (m_joystick.getTriggerPressed()) {
+    if (m_joystick.getR1ButtonPressed()) {
       // We just pressed the trigger, so let's set our next reference
       m_loop.setNextR(VecBuilder.fill(kSpinupRadPerSec));
-    } else if (m_joystick.getTriggerReleased()) {
+    } else if (m_joystick.getR1ButtonReleased()) {
       // We just released the trigger, so let's spin down
       m_loop.setNextR(VecBuilder.fill(0.0));
     }
