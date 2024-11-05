@@ -25,12 +25,12 @@ import edu.wpi.first.units.MutableMeasure;
 import edu.wpi.first.units.Velocity;
 import edu.wpi.first.units.Voltage;
 import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.sysid.SysIdRoutineLog;
+import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 
 public class Flywheel extends SubsystemBase {
-  private int kMotorPort;
-
   // Volts per (radian per second)
   private static final double kFlywheelKv = 0.023; //TUNE this
 
@@ -69,37 +69,25 @@ public class Flywheel extends SubsystemBase {
   private final LinearSystemLoop<N1, N1, N1> m_loop =
       new LinearSystemLoop<>(m_flywheelPlant, m_controller, m_observer, 12.0, 0.020);
 
-  private final TalonFX m_motor = new TalonFX(kMotorPort);
-
-  private final int k_flywheelPort = 0;
-
-  private TalonFX m_flywheel = new TalonFX(k_flywheelPort);
+  private TalonFX m_flywheel;
 
   private final MutableMeasure<Voltage> m_appliedVoltage = mutable(Volts.of(0));
   private final MutableMeasure<Angle> m_angle = mutable(Rotations.of(0));
   private final MutableMeasure<Velocity<Angle>> m_velocity = mutable(RotationsPerSecond.of(0));
 
-  private double reference = 0; // a safe initial value
 
   private final SysIdRoutine m_SysIdRoutine = new SysIdRoutine(
     new SysIdRoutine.Config(),
     new SysIdRoutine.Mechanism(
-      (Measure<Voltage> volts) -> {
-        m_flywheel.setVoltage(volts.in(Volts));
-      },
-      log -> {
-        log.motor("flywheel")
-          .voltage(m_appliedVoltage.mut_replace(m_flywheel.get() * RobotController.getBatteryVoltage(), Volts))
-          .angularPosition(m_angle.mut_replace(m_flywheel.getPosition().getValueAsDouble(), Rotations))
-          .angularVelocity(m_velocity.mut_replace(m_flywheel.getVelocity().getValueAsDouble() * 2.0 * Math.PI, RotationsPerSecond));
-      },
+      this::setVoltage,
+      this::logFlywheel,
       this
       )
   );
 
   /** Creates a new Flywheel. */
   public Flywheel(int port) {
-    this.kMotorPort = port;
+    m_flywheel = new TalonFX(port);
     m_loop.reset(VecBuilder.fill(getEncoderRate()));
   }
 
@@ -116,16 +104,35 @@ public class Flywheel extends SubsystemBase {
     // voltage = duty cycle * battery voltage, so
     // duty cycle = voltage / battery voltage
     double nextVoltage = m_loop.getU(0);
-    m_motor.setVoltage(nextVoltage);
+    m_flywheel.setVoltage(nextVoltage);
   }
 
   private double getEncoderRate() {
-    double v = m_motor.getVelocity().getValueAsDouble();
+    double v = m_flywheel.getVelocity().getValueAsDouble();
     return v * 2.0 * Math.PI;
   }
 
   public void setVelocity(double velocity) {
     m_loop.setNextR(VecBuilder.fill(velocity));
+  }
+
+  public Command sysIdQuasistatic(SysIdRoutine.Direction direction) {
+    return m_SysIdRoutine.quasistatic(direction);
+  }
+
+  public Command sysIdDynamic(SysIdRoutine.Direction direction) {
+    return m_SysIdRoutine.dynamic(direction);
+  }
+
+  private void setVoltage(Measure<Voltage> volts) {
+    m_flywheel.setVoltage(volts.in(Volts));
+  }
+
+  private void logFlywheel(SysIdRoutineLog log) {
+    log.motor("flywheel")
+      .voltage(m_appliedVoltage.mut_replace(m_flywheel.get() * RobotController.getBatteryVoltage(), Volts))
+      .angularPosition(m_angle.mut_replace(m_flywheel.getPosition().getValueAsDouble(), Rotations))
+      .angularVelocity(m_velocity.mut_replace(m_flywheel.getVelocity().getValueAsDouble() * 2.0 * Math.PI, RotationsPerSecond));
   }
 }
 
